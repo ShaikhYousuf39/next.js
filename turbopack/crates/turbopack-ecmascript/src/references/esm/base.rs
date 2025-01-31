@@ -115,7 +115,7 @@ pub struct EsmAssetReference {
     pub origin: ResolvedVc<Box<dyn ResolveOrigin>>,
     pub request: ResolvedVc<Request>,
     pub annotations: ImportAnnotations,
-    pub issue_source: ResolvedVc<IssueSource>,
+    pub issue_source: IssueSource,
     pub export_name: Option<ResolvedVc<ModulePart>>,
     pub import_externals: bool,
 }
@@ -134,7 +134,7 @@ impl EsmAssetReference {
     pub fn new(
         origin: ResolvedVc<Box<dyn ResolveOrigin>>,
         request: ResolvedVc<Request>,
-        issue_source: ResolvedVc<IssueSource>,
+        issue_source: IssueSource,
         annotations: Value<ImportAnnotations>,
         export_name: Option<ResolvedVc<ModulePart>>,
         import_externals: bool,
@@ -194,7 +194,7 @@ impl ModuleReference for EsmAssetReference {
             *self.request,
             Value::new(ty),
             false,
-            Some(*self.issue_source),
+            Some(self.issue_source.clone()),
         )
         .await?;
 
@@ -208,7 +208,7 @@ impl ModuleReference for EsmAssetReference {
                             InvalidExport {
                                 export: export_name,
                                 module,
-                                source: self.issue_source,
+                                source: self.issue_source.clone(),
                             }
                             .resolved_cell()
                             .emit();
@@ -284,7 +284,6 @@ impl CodeGenerateable for EsmAssetReference {
             {
                 let span = this
                     .issue_source
-                    .await?
                     .to_swc_offsets()
                     .await?
                     .map_or(DUMMY_SP, |(start, end)| {
@@ -411,7 +410,7 @@ fn var_decl_with_span(mut decl: Stmt, span: Span) -> Stmt {
 pub struct InvalidExport {
     export: ResolvedVc<RcStr>,
     module: ResolvedVc<Box<dyn EcmascriptChunkPlaceable>>,
-    source: ResolvedVc<IssueSource>,
+    source: IssueSource,
 }
 
 #[turbo_tasks::value_impl]
@@ -499,6 +498,6 @@ impl Issue for InvalidExport {
 
     #[turbo_tasks::function]
     fn source(&self) -> Vc<OptionIssueSource> {
-        Vc::cell(Some(self.source))
+        Vc::cell(Some(self.source.clone()))
     }
 }
