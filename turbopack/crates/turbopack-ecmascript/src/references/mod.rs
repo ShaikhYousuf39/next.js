@@ -17,7 +17,7 @@ pub mod unreachable;
 pub mod util;
 pub mod worker;
 
-use std::{borrow::Cow, collections::BTreeMap, mem::take, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, mem::take, ops::Deref, sync::Arc};
 
 use anyhow::{bail, Result};
 use constant_condition::{ConstantConditionCodeGen, ConstantConditionValue};
@@ -932,9 +932,9 @@ pub(crate) async fn analyse_ecmascript_module_internal(
 
             match effect {
                 Effect::Unreachable { start_ast_path } => {
-                    analysis.add_code_gen(Unreachable::new(
-                        AstPathRange::StartAfter(start_ast_path.to_vec()).resolved_cell(),
-                    ));
+                    analysis.add_code_gen(Unreachable::new(AstPathRange::StartAfter(
+                        start_ast_path.to_vec(),
+                    )));
                 }
                 Effect::Conditional {
                     condition,
@@ -953,9 +953,7 @@ pub(crate) async fn analyse_ecmascript_module_internal(
 
                     macro_rules! inactive {
                         ($block:ident) => {
-                            analysis.add_code_gen(Unreachable::new(
-                                $block.range.clone().resolved_cell(),
-                            ));
+                            analysis.add_code_gen(Unreachable::new($block.range.clone()));
                         };
                     }
                     macro_rules! condition {
@@ -963,7 +961,7 @@ pub(crate) async fn analyse_ecmascript_module_internal(
                             if !condition_has_side_effects {
                                 analysis.add_code_gen(ConstantConditionCodeGen::new(
                                     Value::new($expr),
-                                    ResolvedVc::cell(condition_ast_path.to_vec()),
+                                    condition_ast_path.to_vec().into(),
                                 ));
                             }
                         };
@@ -1274,11 +1272,7 @@ pub(crate) async fn analyse_ecmascript_module_internal(
 
                             analysis.add_local_reference(r);
                             analysis.add_import_reference(r);
-                            analysis.add_code_gen(EsmBinding::new(
-                                r,
-                                export,
-                                ResolvedVc::cell(ast_path),
-                            ));
+                            analysis.add_code_gen(EsmBinding::new(r, export, ast_path.into()));
                         }
                     }
                 }
@@ -1304,7 +1298,7 @@ pub(crate) async fn analyse_ecmascript_module_internal(
                         ));
                     }
 
-                    analysis.add_code_gen(ImportMetaRef::new(ResolvedVc::cell(ast_path)));
+                    analysis.add_code_gen(ImportMetaRef::new(ast_path.into()));
                 }
             }
         }
@@ -1580,9 +1574,8 @@ async fn handle_call<G: Fn(Vec<Effect>) + Send + Sync>(
                         ),
                     );
                     if ignore_dynamic_requests {
-                        analysis.add_code_gen(DynamicExpression::new_promise(ResolvedVc::cell(
-                            ast_path.to_vec(),
-                        )));
+                        analysis
+                            .add_code_gen(DynamicExpression::new_promise(ast_path.to_vec().into()));
                         return Ok(());
                     }
                 }
@@ -1624,9 +1617,7 @@ async fn handle_call<G: Fn(Vec<Effect>) + Send + Sync>(
                         ),
                     );
                     if ignore_dynamic_requests {
-                        analysis.add_code_gen(DynamicExpression::new(ResolvedVc::cell(
-                            ast_path.to_vec(),
-                        )));
+                        analysis.add_code_gen(DynamicExpression::new(ast_path.to_vec().into()));
                         return Ok(());
                     }
                 }
@@ -1680,9 +1671,7 @@ async fn handle_call<G: Fn(Vec<Effect>) + Send + Sync>(
                         ),
                     );
                     if ignore_dynamic_requests {
-                        analysis.add_code_gen(DynamicExpression::new(ResolvedVc::cell(
-                            ast_path.to_vec(),
-                        )));
+                        analysis.add_code_gen(DynamicExpression::new(ast_path.to_vec().into()));
                         return Ok(());
                     }
                 }
@@ -2300,9 +2289,7 @@ async fn handle_member(
             JsValue::WellKnownFunction(WellKnownFunctionKind::Require { .. }),
             JsValue::Constant(s),
         ) if s.as_str() == Some("cache") => {
-            analysis.add_code_gen(CjsRequireCacheAccess::new(ResolvedVc::cell(
-                ast_path.to_vec(),
-            )));
+            analysis.add_code_gen(CjsRequireCacheAccess::new(ast_path.to_vec().into()));
         }
         _ => {}
     }
@@ -2393,13 +2380,13 @@ async fn handle_free_var_reference(
         FreeVarReference::Value(value) => {
             analysis.add_code_gen(ConstantValueCodeGen::new(
                 Value::new(value.clone()),
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
             ));
         }
         FreeVarReference::Ident(value) => {
             analysis.add_code_gen(IdentReplacement::new(
                 value.clone(),
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
             ));
         }
         FreeVarReference::EcmaScriptModule {
@@ -2447,7 +2434,7 @@ async fn handle_free_var_reference(
             analysis.add_code_gen(EsmBinding::new(
                 esm_reference,
                 export.clone(),
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
             ));
         }
     }
@@ -2497,7 +2484,7 @@ async fn analyze_amd_define(
                     AmdDefineDependencyElement::Module,
                 ],
                 origin,
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
                 AmdDefineFactoryType::Function,
                 issue_source(*source, span).to_resolved().await?,
                 in_try,
@@ -2511,7 +2498,7 @@ async fn analyze_amd_define(
                     AmdDefineDependencyElement::Module,
                 ],
                 origin,
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
                 AmdDefineFactoryType::Unknown,
                 issue_source(*source, span).to_resolved().await?,
                 in_try,
@@ -2525,7 +2512,7 @@ async fn analyze_amd_define(
                     AmdDefineDependencyElement::Module,
                 ],
                 origin,
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
                 AmdDefineFactoryType::Function,
                 issue_source(*source, span).to_resolved().await?,
                 in_try,
@@ -2535,7 +2522,7 @@ async fn analyze_amd_define(
             analysis.add_code_gen(AmdDefineWithDependenciesCodeGen::new(
                 vec![],
                 origin,
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
                 AmdDefineFactoryType::Value,
                 issue_source(*source, span).to_resolved().await?,
                 in_try,
@@ -2549,7 +2536,7 @@ async fn analyze_amd_define(
                     AmdDefineDependencyElement::Module,
                 ],
                 origin,
-                ResolvedVc::cell(ast_path.to_vec()),
+                ast_path.to_vec().into(),
                 AmdDefineFactoryType::Unknown,
                 issue_source(*source, span).to_resolved().await?,
                 in_try,
@@ -2637,7 +2624,7 @@ async fn analyze_amd_define_with_deps(
     analysis.add_code_gen(AmdDefineWithDependenciesCodeGen::new(
         requests,
         origin,
-        ResolvedVc::cell(ast_path.to_vec()),
+        ast_path.to_vec().into(),
         AmdDefineFactoryType::Function,
         issue_source(*source, span).to_resolved().await?,
         in_try,
@@ -3049,8 +3036,8 @@ impl VisitAstPath for ModuleReferencesVisitor<'_> {
         export: &'ast ExportAll,
         ast_path: &mut AstNodePath<AstParentNodeRef<'r>>,
     ) {
-        let path = ResolvedVc::cell(as_parent_path(ast_path));
-        self.analysis.add_code_gen(EsmModuleItem::new(path));
+        self.analysis
+            .add_code_gen(EsmModuleItem::new(as_parent_path(ast_path).into()));
         export.visit_children_with_ast_path(self, ast_path);
     }
 
@@ -3114,8 +3101,8 @@ impl VisitAstPath for ModuleReferencesVisitor<'_> {
             }
         }
 
-        let path = ResolvedVc::cell(as_parent_path(ast_path));
-        self.analysis.add_code_gen(EsmModuleItem::new(path));
+        self.analysis
+            .add_code_gen(EsmModuleItem::new(as_parent_path(ast_path).into()));
         export.visit_children_with_ast_path(self, ast_path);
     }
 
@@ -3129,9 +3116,7 @@ impl VisitAstPath for ModuleReferencesVisitor<'_> {
                 .insert(name.clone(), EsmExport::LocalBinding(name, false));
         });
         self.analysis
-            .add_code_gen(EsmModuleItem::new(ResolvedVc::cell(as_parent_path(
-                ast_path,
-            ))));
+            .add_code_gen(EsmModuleItem::new(as_parent_path(ast_path).into()));
         export.visit_children_with_ast_path(self, ast_path);
     }
 
@@ -3145,9 +3130,7 @@ impl VisitAstPath for ModuleReferencesVisitor<'_> {
             EsmExport::LocalBinding(magic_identifier::mangle("default export").into(), false),
         );
         self.analysis
-            .add_code_gen(EsmModuleItem::new(ResolvedVc::cell(as_parent_path(
-                ast_path,
-            ))));
+            .add_code_gen(EsmModuleItem::new(as_parent_path(ast_path).into()));
         export.visit_children_with_ast_path(self, ast_path);
     }
 
@@ -3174,9 +3157,7 @@ impl VisitAstPath for ModuleReferencesVisitor<'_> {
             }
         }
         self.analysis
-            .add_code_gen(EsmModuleItem::new(ResolvedVc::cell(as_parent_path(
-                ast_path,
-            ))));
+            .add_code_gen(EsmModuleItem::new(as_parent_path(ast_path).into()));
         export.visit_children_with_ast_path(self, ast_path);
     }
 
@@ -3185,7 +3166,7 @@ impl VisitAstPath for ModuleReferencesVisitor<'_> {
         import: &'ast ImportDecl,
         ast_path: &mut AstNodePath<AstParentNodeRef<'r>>,
     ) {
-        let path = ResolvedVc::cell(as_parent_path(ast_path));
+        let path = as_parent_path(ast_path).into();
         let src = import.src.value.to_string();
         import.visit_children_with_ast_path(self, ast_path);
         if import.type_only {
@@ -3318,9 +3299,23 @@ async fn resolve_as_webpack_runtime(
     }
 }
 
-// TODO enable serialization, then turn into a TaskInput after that
-#[turbo_tasks::value(transparent, serialization = "none")]
+#[turbo_tasks::value(transparent)]
+#[derive(Hash, Debug, Clone)]
 pub struct AstPath(#[turbo_tasks(trace_ignore)] Vec<AstParentKind>);
+
+impl Deref for AstPath {
+    type Target = [AstParentKind];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Vec<AstParentKind>> for AstPath {
+    fn from(v: Vec<AstParentKind>) -> Self {
+        Self(v)
+    }
+}
 
 pub static TURBOPACK_HELPER: Lazy<JsWord> = Lazy::new(|| "__turbopack-helper__".into());
 
