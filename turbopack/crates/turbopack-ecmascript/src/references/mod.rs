@@ -960,7 +960,7 @@ pub(crate) async fn analyse_ecmascript_module_internal(
                         ($expr:expr) => {
                             if !condition_has_side_effects {
                                 analysis.add_code_gen(ConstantConditionCodeGen::new(
-                                    Value::new($expr),
+                                    $expr,
                                     condition_ast_path.to_vec().into(),
                                 ));
                             }
