@@ -636,6 +636,7 @@ impl CodeGenerateable for EsmExports {
                     getters: Expr = getters.clone()
                 ),
             )],
-        ))
+        )
+        .cell())
     }
 }

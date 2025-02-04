@@ -185,7 +185,7 @@ impl CodeGenerateable for CjsRequireAssetReference {
             );
         }));
 
-        Ok(CodeGeneration::visitors(visitors))
+        Ok(CodeGeneration::visitors(visitors).cell())
     }
 }
 
@@ -298,7 +298,7 @@ impl CodeGenerateable for CjsRequireResolveAssetReference {
             // but we can ignore that as it will be recomputed anyway.
         }));
 
-        Ok(CodeGeneration::visitors(visitors))
+        Ok(CodeGeneration::visitors(visitors).cell())
     }
 }
 
@@ -315,7 +315,7 @@ impl CjsRequireCacheAccess {
         &self,
         _module_graph: Vc<ModuleGraph>,
         _chunking_context: Vc<Box<dyn ChunkingContext>>,
-    ) -> Result<Vc<CodeGeneration>> {
+    ) -> Result<CodeGeneration> {
         let mut visitors = Vec::new();
 
         visitors.push(create_visitor!(self.path, visit_mut_expr(expr: &mut Expr) {

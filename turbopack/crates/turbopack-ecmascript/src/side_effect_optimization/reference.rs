@@ -138,6 +138,7 @@ impl CodeGenerateable for EcmascriptModulePartReference {
                 name = Ident::new(ident.clone().into(), DUMMY_SP, Default::default()),
                 id: Expr = module_id_to_lit(&id),
             ),
-        ))
+        )
+        .cell())
     }
 }

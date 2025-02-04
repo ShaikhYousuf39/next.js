@@ -317,6 +317,6 @@ impl CodeGenerateable for UrlAssetReference {
             }
         };
 
-        Ok(CodeGeneration::visitors(visitors))
+        Ok(CodeGeneration::visitors(visitors).cell())
     }
 }

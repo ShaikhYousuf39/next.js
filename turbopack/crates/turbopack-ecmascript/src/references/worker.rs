@@ -174,6 +174,6 @@ impl CodeGenerateable for WorkerAssetReference {
             );
         });
 
-        Ok(CodeGeneration::visitors(vec![visitor]))
+        Ok(CodeGeneration::visitors(vec![visitor]).cell())
     }
 }
